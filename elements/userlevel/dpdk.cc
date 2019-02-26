@@ -370,23 +370,75 @@ DPDK::initialize(ErrorHandler *errh)
 # endif
 	port_conf.rxmode.max_rx_pkt_len = _rx_max_pkt_len;
 	port_conf.rxmode.split_hdr_size = _rx_split_hdr_size;
+#if (RTE_VERSION < RTE_VERSION_NUM(18,11,0,0))
 	port_conf.rxmode.header_split = _rx_header_split;
 	port_conf.rxmode.hw_ip_checksum = _rx_checksum;
 	port_conf.rxmode.hw_strip_crc = _rx_strip_crc;
 	port_conf.rxmode.jumbo_frame = _rx_jumbo_frame;
 	port_conf.rxmode.enable_lro = _rx_tcp_lro;
 	port_conf.rxmode.enable_scatter = _rx_scatter;
+#else
+    if (_rx_header_split) port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_HEADER_SPLIT;
+    if (_rx_checksum) port_conf.rxmode.offloads     |= DEV_RX_OFFLOAD_IPV4_CKSUM | DEV_RX_OFFLOAD_UDP_CKSUM | DEV_RX_OFFLOAD_TCP_CKSUM;
+    if (!_rx_strip_crc) port_conf.rxmode.offloads   |= DEV_RX_OFFLOAD_KEEP_CRC;
+    if (_rx_jumbo_frame) port_conf.rxmode.offloads  |= DEV_RX_OFFLOAD_JUMBO_FRAME;
+    if (_rx_tcp_lro) port_conf.rxmode.offloads      |= DEV_RX_OFFLOAD_TCP_LRO;
+    if (_rx_scatter) port_conf.rxmode.offloads      |= DEV_RX_OFFLOAD_SCATTER;
+#endif
 	port_conf.intr_conf.lsc = 0;
 	port_conf.intr_conf.rxq = 0; // Set to 1 to test RX interrupts
+
+    uint64_t tx_offloads = 0;
+
+	struct rte_eth_rxconf rx_conf;
+# if RTE_VER_MAJOR >= 2 || RTE_VER_YEAR >= 16
+	memcpy(&rx_conf, &dev_info.default_rxconf, sizeof(rx_conf));
+# else
+	bzero(&rx_conf, sizeof(rx_conf));
+# endif
+
+	struct rte_eth_txconf tx_conf;
+# if RTE_VER_MAJOR >= 2 || RTE_VER_YEAR >= 16
+	memcpy(&tx_conf, &dev_info.default_txconf, sizeof(tx_conf));
+# else
+	bzero(&tx_conf, sizeof(tx_conf));
+# endif
+
+#if (RTE_VERSION < RTE_VERSION_NUM(18,11,0,0))
+    if (_tx_tcp_tso)
+		tx_offloads &= ~ETH_TXQ_FLAGS_NOMULTSEGS;
+	else
+		tx_offloads |= ETH_TXQ_FLAGS_NOMULTSEGS;
+
+	if (_tx_ip_checksum || _tx_tcp_checksum || _tx_udp_checksum)
+		tx_offloads &= ~ETH_TXQ_FLAGS_NOOFFLOADS;
+	else
+		tx_offloads |= ETH_TXQ_FLAGS_NOOFFLOADS;
+
+	tx_conf.txq_flags = tx_offloads;
+#else
+	if (_tx_tcp_tso)
+		tx_offloads |= DEV_TX_OFFLOAD_MULTI_SEGS;
+	else
+		tx_offloads &= ~DEV_TX_OFFLOAD_MULTI_SEGS;
+
+	if (_tx_ip_checksum) tx_offloads |= DEV_TX_OFFLOAD_IPV4_CKSUM;
+	if (_tx_tcp_checksum) tx_offloads |= DEV_TX_OFFLOAD_TCP_CKSUM;
+	if (_tx_udp_checksum) tx_offloads |= DEV_TX_OFFLOAD_UDP_CKSUM;
+    tx_conf.offloads |= tx_offloads;
+#endif
 
 	//TODO Verify symmetry
 	// Commented,  to force using rss also with 1 thread
 	// if (_nthreads > 1) {
     port_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
+    port_conf.txmode.offloads |= tx_offloads;
     port_conf.rx_adv_conf.rss_conf.rss_key = key;
     port_conf.rx_adv_conf.rss_conf.rss_key_len = sizeof(key);
     port_conf.rx_adv_conf.rss_conf.rss_hf =
-                        ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP | ETH_RSS_SCTP;
+                        ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
+    if (dev_info.flow_type_rss_offloads & ETH_RSS_SCTP)
+        port_conf.rx_adv_conf.rss_conf.rss_hf |= ETH_RSS_SCTP;
 	//}
 
 	// Get device socket (only relevant in NUMA architectures)
@@ -399,39 +451,18 @@ DPDK::initialize(ErrorHandler *errh)
 	if (retval != 0)
 		return errh->error("Configure failed");
 
-	struct rte_eth_rxconf rx_conf;
-# if RTE_VER_MAJOR >= 2 || RTE_VER_YEAR >= 16
-	memcpy(&rx_conf, &dev_info.default_rxconf, sizeof(rx_conf));
-# else
-	bzero(&rx_conf, sizeof(rx_conf));
-# endif
-	rx_conf.rx_thresh.pthresh = DPDK_RX_PTHRESH;
+    rx_conf.rx_thresh.pthresh = DPDK_RX_PTHRESH;
 	rx_conf.rx_thresh.hthresh = DPDK_RX_HTHRESH;
 	rx_conf.rx_thresh.wthresh = DPDK_RX_WTHRESH;
 	rx_conf.rx_free_thresh = 32;
 
-	struct rte_eth_txconf tx_conf;
-# if RTE_VER_MAJOR >= 2 || RTE_VER_YEAR >= 16
-	memcpy(&tx_conf, &dev_info.default_txconf, sizeof(tx_conf));
-# else
-	bzero(&tx_conf, sizeof(tx_conf));
-# endif
 	tx_conf.tx_thresh.pthresh = DPDK_TX_PTHRESH;
 	tx_conf.tx_thresh.hthresh = DPDK_TX_HTHRESH;
 	tx_conf.tx_thresh.wthresh = DPDK_TX_WTHRESH;
 	tx_conf.tx_free_thresh = 32;
 	tx_conf.tx_rs_thresh = 0;
-	if (_tx_tcp_tso)
-		tx_conf.txq_flags &= ~ETH_TXQ_FLAGS_NOMULTSEGS;
-	else
-		tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS;
 
-	if (_tx_ip_checksum || _tx_tcp_checksum || _tx_udp_checksum)
-		tx_conf.txq_flags &= ~ETH_TXQ_FLAGS_NOOFFLOADS;
-	else
-		tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOOFFLOADS;
-
-	// Set callback for link interrupt
+    // Set callback for link interrupt
 	retval = rte_eth_dev_callback_register(_port, RTE_ETH_EVENT_INTR_LSC, lsi_event_callback, (void*)this);
 	
 	if (retval != 0)
