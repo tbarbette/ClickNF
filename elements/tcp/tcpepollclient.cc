@@ -67,7 +67,6 @@ TCPEpollClient::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 	if (Args(conf, this, errh)
 		.read_mp("ADDRESS", _addr)
-		.read_mp("PORT", _port)
 		.read("VERBOSE", _verbose)
 		.read("BATCH", _batch)
 		.read("PID", _pid)

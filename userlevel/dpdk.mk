@@ -47,6 +47,10 @@ ifeq ($(CONFIG_RTE_LIBRTE_PORT),y)
 LIBS += -lrte_port
 endif
 
+ifeq ($(CONFIG_RTE_LIBRTE_CRYPTODEV),y)
+LIBS += -lrte_cryptodev
+endif
+
 ifeq ($(CONFIG_RTE_LIBRTE_TIMER),y)
 LIBS += -lrte_timer
 endif
@@ -187,6 +191,12 @@ endif
 ifeq ($(CONFIG_RTE_LIBRTE_E1000_PMD),y)
 LIBS += -lrte_pmd_e1000
 endif
+
+ifeq ($(CONFIG_RTE_LIBRTE_MLX5_PMD),y)
+LIBS += -lrte_pmd_mlx5 -lmlx5 -libverbs -lmnl
+endif
+
+
 
 ifeq ($(CONFIG_RTE_LIBRTE_PMD_RING),y)
 LIBS += -lrte_pmd_ring

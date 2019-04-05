@@ -1,10 +1,10 @@
 /*
  * socks4proxy.{cc,hh} -- 	a simple implementation of modular socks proxy. 
  * 
- * 					      _____Proxy_____
- *				        ---> |               | --->
- * Client	<->	TCPEpollServer       | Server-Client |       TCPEpollClient	<->	Server
- * 					<--- |_______________| <---
+ *                                _____Proxy_____
+ *                          ---> |               | --->
+ * Client <-> TCPEpollServer     | Server-Client |      TCPEpollClient <-> Server
+ *                          <--- |_______________| <---
  * Massimo Gallo
  *
  * Copyright (c) 2018 Nokia Bell Labs

@@ -98,7 +98,8 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     dev_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
     dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
-    dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
+    dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
+    dev_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
 
     //We must open at least one queue per direction
     if (info.rx_queues.size() == 0) {
@@ -121,20 +122,38 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 #else
     bzero(&rx_conf,sizeof rx_conf);
 #endif
+
+#if RTE_VERSION < RTE_VERSION_NUM(18,8,0,0)
     rx_conf.rx_thresh.pthresh = RX_PTHRESH;
     rx_conf.rx_thresh.hthresh = RX_HTHRESH;
     rx_conf.rx_thresh.wthresh = RX_WTHRESH;
+#endif
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+    rx_conf.offloads = dev_conf.rxmode.offloads;
+#endif
 
     struct rte_eth_txconf tx_conf;
-#if RTE_VERSION >= (RTE_VERSION_NUM(2,1,0,0))
+    tx_conf = dev_info.default_txconf;
+#if RTE_VERSION >= RTE_VERSION_NUM(2,0,0,0)
     memcpy(&tx_conf, &dev_info.default_txconf, sizeof tx_conf);
 #else
     bzero(&tx_conf,sizeof tx_conf);
 #endif
+
+#if RTE_VERSION < RTE_VERSION_NUM(18,8,0,0) && RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+    tx_conf.txq_flags = ETH_TXQ_FLAGS_IGNORE;
+#else
     tx_conf.tx_thresh.pthresh = TX_PTHRESH;
     tx_conf.tx_thresh.hthresh = TX_HTHRESH;
     tx_conf.tx_thresh.wthresh = TX_WTHRESH;
+#endif
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,i0)
+    tx_conf.offloads = dev_conf.txmode.offloads;
+#endif
+#if RTE_VERSION <= RTE_VERSION_NUM(18,05,0,0)
     tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
+#endif
 
     int numa_node = DPDKDevice::get_port_numa_node(port_id);
     for (int i = 0; i < info.rx_queues.size(); ++i) {

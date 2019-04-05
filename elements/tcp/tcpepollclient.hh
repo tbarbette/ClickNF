@@ -73,7 +73,6 @@ class TCPEpollClient final : public TCPApplication { public:
 
 	bool _verbose;
 	IPAddress _addr;
-	uint16_t _port;
 	uint32_t _batch;
 	ThreadData *_thread;
 	uint16_t _nthreads;
