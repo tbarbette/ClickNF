@@ -4,8 +4,8 @@
 
 require(library test-tcp-layer2.click)
 
-define($DEV0 eth1, $ADDR0 10.0.0.1, $MAC0 aa:aa:aa:aa:aa:aa)
-define($DEV1 eth2, $ADDR1 10.0.1.1, $MAC1 bb:bb:bb:bb:bb:bb)
+define($DEV0 dpdk0, $ADDR0 10.220.0.1, $MAC0 50:6b:4b:43:88:ca)
+define($DEV1 dpdk1, $ADDR1 10.221.0.1, $MAC1 50:6b:4b:43:88:cb)
 
 AddressInfo($DEV0 $ADDR0 $MAC0);
 AddressInfo($DEV1 $ADDR1 $MAC1);
@@ -15,9 +15,9 @@ dpdk1 :: DPDK($DEV1, BURST 32, TX_RING_SIZE 512, RX_RING_SIZE 512, TX_IP_CHECKSU
 
 tcp_layer :: TCPLayer(ADDRS $ADDR0 $ADDR1, VERBOSE 0, BUCKETS 131072);
 
-tcp_epolls :: TCPEpollServer($DEV0, 9000, VERBOSE 1, PID 1);
-tcp_epollc :: TCPEpollClient($DEV1, 9000, VERBOSE 1, PID 1);
-tcp_proxy :: Socks4Proxy(VERBOSE 1, PID 1);
+tcp_epolls :: TCPEpollServer(10.220.0.1, 9000, VERBOSE 0, PID 1);
+tcp_epollc :: TCPEpollClient(10.221.0.1, VERBOSE 0, PID 1);
+tcp_proxy :: Socks4Proxy(VERBOSE 0, PID 1);
 tcp_out :: Tee();
 
 // -------------------------------------------------------------------
@@ -76,10 +76,9 @@ dpdk0
               -> dpdk0;
      class0[1] -> [1]arpq0;
      class0[0] -> Strip(14)
-              -> Print("RX0")
+            //  -> Print("RX0")
               -> CheckIPHeader(CHECKSUM false)
-	      -> IPPrint("RX0")
-              -> FastIPClassifier(tcp dst host $ADDR0)  // 1st out of FastIPClassifier may be send batches
+	      //-> IPPrint("RX0")
               -> CheckTCPHeader(CHECKSUM false)
               -> [0]tcp_layer;
 
@@ -93,10 +92,9 @@ dpdk1
               -> dpdk1; 
      class1[1] -> [1]arpq1;
      class1[0] -> Strip(14)
-              -> Print("RX1")
+            //  -> Print("RX1")
               -> CheckIPHeader(CHECKSUM false)
-              -> IPPrint("RX1")
-              -> FastIPClassifier(tcp dst host $ADDR1)  // 1st out of FastIPClassifier may be send batches
+        //      -> IPPrint("RX1")
               -> CheckTCPHeader(CHECKSUM false)
               -> [0]tcp_layer;
 
@@ -105,16 +103,16 @@ dpdk1
 // -------------------------------------------------------------------
 
 tcp_layer[0]
-  -> ic :: IPClassifier(tcp src host $DEV0, tcp src host $DEV1);
+  -> ic :: IPClassifier(tcp dst net 10.221.0.0/24, tcp dst net 10.220.0.0/24);
 
      ic[0]
        -> GetIPAddress(16)   // This only works with nodes in the same network
-       -> IPPrint("TX0")
+      // -> IPPrint("TX0")
        -> [0]arpq0;
 
      ic[1]
        -> GetIPAddress(16)   // This only works with nodes in the same network
-       -> IPPrint("TX1")
+      // -> IPPrint("TX1")
        -> [0]arpq1;
 
 

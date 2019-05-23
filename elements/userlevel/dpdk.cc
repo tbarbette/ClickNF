@@ -470,7 +470,7 @@ DPDK::initialize(ErrorHandler *errh)
 
 	// Delay
 	click_chatter("%s: delaying start by 5s", class_name());
-	rte_delay_ms(5000);
+	rte_delay_ms(500);
 
 	// TX/RX queue setup
 	for (unsigned i = 0; i < _nthreads; ++i) {
@@ -567,7 +567,7 @@ DPDK::initialize(ErrorHandler *errh)
 
 		retval = rte_eth_dev_flow_ctrl_set(_port, &fc_conf);
 		if (retval != 0)
-			return errh->error("Flow control set failed");
+			errh->warning("Flow control set failed");
 	}
 
 	// Initialize stats

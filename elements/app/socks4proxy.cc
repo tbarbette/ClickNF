@@ -108,6 +108,12 @@ Socks4Proxy::push(int port, Packet *p)
 			}
 			
 			if (TCP_SOCK_DEL_FLAG_ANNO(p)) {
+                if (fd == -1) {
+				if (_verbose)
+					  click_chatter("%s: Removing a dead socket?",class_name(), fd);
+				p->kill();
+                    return;
+                }
 				int pair = _socketTable[c][fd].pair;
 				//Remove both legs of Proxy from socket table
 				if (pair != -1){ 

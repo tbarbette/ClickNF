@@ -190,6 +190,7 @@ TCPState::wait_event(int event)
 
 		// If about to sleep and socket is nonblocking, notify error
 		if (flags & SOCK_NONBLOCK) {
+            click_chatter("wait nonblock");
 			ret = EAGAIN;
 			break;
 		}
@@ -203,6 +204,7 @@ TCPState::wait_event(int event)
 
 		// If some error occurred while sleeping, notify error
 		if (error) {
+            click_chatter("sleep error");
 			ret = error;
 			break;
 		}
