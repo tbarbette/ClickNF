@@ -242,7 +242,7 @@ TCPEpollServer::selected(int sockfd, int revents)
 					curr->set_prev(NULL);
 					if (!p->length()) {
 						p->kill();
-						break;
+						return;
 					}
 					SET_TCP_SOCKFD_ANNO(curr, sockfd);
 					output(TCP_EPOLL_SERVER_OUT_APP_PORT).push(curr);

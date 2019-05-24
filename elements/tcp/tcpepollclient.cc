@@ -187,16 +187,16 @@ TCPEpollClient::selected(int sockfd, int revents)
 		//TODO Send batches instead of single packets if possible
 		//Drain RX queue
 		Packet *p = NULL; 
-		while (p = click_pull(sockfd, _batch)){
+		while (p = click_pull(sockfd, _batch)) {
 			Packet* next=NULL;
 			Packet* curr=p;
-			while (curr){
+			while (curr) {
 				next = curr->next();
 				curr->set_next(NULL);
 				curr->set_prev(NULL);
 				if (!p->length()) {
 					p->kill();
-					break;
+                    return;
 				}
 				SET_TCP_SOCKFD_ANNO(curr, sockfd);
 				output(TCP_EPOLL_CLIENT_OUT_APP_PORT).push(curr);
